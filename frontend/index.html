@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Civic Signal</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<header><span class="brand">Civic Signal</span>
+<nav id="nav"><button data-s="intake">1 Intake</button><button data-s="review">2 Case review</button><button data-s="inbox">3 Inbox / Tracker</button></nav>
+<small style="margin-left:auto" id="modeBadge"></small></header>
+<main>
+
+<section id="intake">
+<div class="top"><div><h2>Add a video</h2><p class="mu" style="margin:6px 0 0">Paste a public TikTok or Instagram link. AI drafts a case, and you decide what happens next.</p></div></div>
+<div class="card">
+  <label for="videoUrl" class="mu">Video link</label>
+  <div class="inp">
+    <input id="videoUrl" placeholder="https://www.tiktok.com/@example/video/..." aria-label="Video link">
+    <label class="btn o" style="display:inline-flex;align-items:center;gap:8px">
+      Upload a file
+      <input id="videoFile" type="file" accept="video/*" style="display:none">
+    </label>
+    <button class="btn" id="submitBtn">Process with AI</button>
+  </div>
+  <small>Only public post details are saved. No private messages or personal profiles.</small>
+  <small id="fileHint" class="alert hidden" style="display:block;margin-top:6px">File upload isn't wired to the live backend yet &mdash; paste a link instead.</small>
+</div>
+
+<h3 style="margin:28px 0 12px">Status</h3>
+<div class="frame" id="intakeState"></div>
+
+<h3 style="margin:28px 0 12px">Recent submissions</h3>
+<div class="card"><ul class="r" id="recent"></ul></div>
+</section>
+
+<section id="review">
+<div class="top"><div><h2>Review this case</h2><p class="mu" style="margin:6px 0 0">Purple dashed fields are AI suggestions. Green fields are your decisions.</p></div>
+<div id="vars" style="display:flex;gap:8px;flex-wrap:wrap"></div></div>
+<div id="rv"></div>
+</section>
+
+<section id="inbox">
+<div class="top"><div><h2>Inbox</h2><p class="mu" style="margin:6px 0 0">Your tracker of every case, in one place.</p></div><button class="btn o" onclick="go('intake')">Add a video</button></div>
+<div class="grid g4" style="margin-bottom:20px">
+<div class="card tile"><small>Total cases</small><b id="tileNew">0</b><small>&nbsp;</small></div>
+<div class="card tile"><small>Issues vs Ideas</small><b id="tileSplit">0 &middot; 0</b><small id="tileSplitSub">0 other</small></div>
+<div class="card tile"><small>Needs review</small><b id="tileReview">0</b><small>Unsure about location</small></div>
+<div class="card tile"><small>Avg time to triage</small><b>&mdash;</b><small>Not tracked yet</small></div>
+</div>
+<div class="card" style="margin-bottom:20px">
+<div class="chips" aria-label="Filters"><span>Type: All &#9662;</span><span>Agency: All &#9662;</span><span>Status: All &#9662;</span><span>Urgency: All &#9662;</span><span>Sort: Newest &#9662;</span></div>
+<div class="tw"><table><thead><tr><th>Type</th><th>Summary</th><th>Agency</th><th>Area</th><th>Urgency</th><th>Priority</th><th>Status</th><th>Views</th></tr></thead><tbody id="tb"></tbody></table></div>
+</div>
+<div class="card"><h3>Recurring themes</h3><p class="mu" style="margin-top:8px">Not wired up yet &mdash; will cluster once <code>/api/signals/aggregate</code> is called on reviewed cases.</p></div>
+</section>
+
+</main>
+<script src="api.js"></script>
+<script src="app.js"></script>
+<script>
+document.getElementById("modeBadge").textContent = "Design proof · " + (MOCK_MODE ? "mock data" : "live backend");
+</script>
+</body></html>

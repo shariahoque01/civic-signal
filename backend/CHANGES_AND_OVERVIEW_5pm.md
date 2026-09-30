@@ -70,3 +70,22 @@ Errors come back as `{"error": "message"}`. Validation errors (422) also include
 - **No browser upload:** there's no file-upload endpoint yet. An upload only works if the file is already in `backend/uploads/`. If the intake screen needs a file picker, a multipart upload endpoint would need to be added.
 - **Aggregation:** signals only appear after calling `POST /api/signals/aggregate`. It needs 2 or more **reviewed** observations with the same topic and borough.
 - **Root URL:** `/` returns 404, which is expected.
+
+## Bug found while testing: TikTok extraction needs `curl_cffi`
+Posting a real TikTok URL failed with `[TikTok] Unexpected response from webpage request` — yt-dlp's TikTok extractor now has to solve an anti-bot challenge, which requires browser-TLS "impersonation," and the dependency for that (`curl_cffi`) wasn't installed. Fix: `uv pip install "curl_cffi>=0.5.10"` in the venv. This should get added as a real dependency in `pyproject.toml` (`yt-dlp[curl-cffi]` or a plain `curl_cffi>=0.5.10` entry) so a fresh `uv sync` isn't missing it. After installing it and restarting uvicorn, the curated TikTok link processed fine (201, ~35s) and matched the Observation shape documented above exactly — seeded into `backend/database.db`.
+
+## Frontend (this session)
+Built in `frontend/` — plain HTML/CSS/JS, no build step, no framework. Visual design (CSS vars, class names, purple/dashed = AI vs. green = staff) is carried over unchanged from `civic-signal.html`.
+
+- `index.html` — markup for the three screens (Intake / Case review / Inbox), same section-toggle pattern as the design concept.
+- `styles.css` — the design concept's CSS, verbatim.
+- `api.js` — the **only** place that talks to the network. A `MOCK_MODE` flag at the top switches every call between local mock data and the real endpoints above; a full request/response doc comment sits above the `api` object. Methods: `processVideo`, `getCases`, `getCase`, `saveCase`.
+- `app.js` — nav, rendering, and wiring the three screens to `api.js`.
+
+Decisions baked in, in case the contract shifts again:
+- **File upload** is mock-only for now. With `MOCK_MODE: false`, the upload button is disabled (there's no real upload endpoint yet — see "No browser upload" above); only the link path hits `/api/process` for real.
+- **Priority** is shown as High/Medium/Low directly (not P1–P4), matching `urgency`/`final_priority`'s enum 1:1 — no translation layer to keep in sync.
+- **Inbox and Case review both call the real `getCases`/`getCase`/`saveCase`** when `MOCK_MODE` is off, not just Intake — one flag governs all four methods uniformly.
+- The backend doesn't return video metadata (creator handle, platform, views/shares, post date) — Case review shows these as UI-only "display" fields that are simply blank when data comes from the real API, and are never sent back in a PATCH.
+
+Verified end-to-end with a headless-browser pass through Intake → loading → Case review → Inbox → row click → priority/status change → save → error path, with console errors checked at each step.
