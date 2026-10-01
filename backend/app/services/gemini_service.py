@@ -26,6 +26,11 @@ class GeminiError(RuntimeError):
     pass
 
 
+def is_configured() -> bool:
+    key = get_settings().gemini_api_key
+    return bool(key) and not key.startswith("your-")
+
+
 def _client() -> genai.Client:
     key = get_settings().gemini_api_key
     if not key or key.startswith("your-"):

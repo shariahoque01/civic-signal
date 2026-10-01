@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Civic Signal Insights</title>
+<style>
+/* Tokens use the same names and values as frontend/styles.css, so a restyle there can be copied here. */
+:root { --bg:#F5F6F3; --sf:#fff; --tx:#17212B; --mu:#4E5B69; --bd:#D3D9DE; --ac:#0B6E6E; --acs:#DCEFEE;
+  --ai:#573BAE; --ais:#EEE9FA; --wn:#8A1C1C; --wns:#FBE4E4; --s1:#1F55B8; --s2:#A33D00; --neu:#C3CAD0; --band:#FCE8DB; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0F1418; --sf:#182028; --tx:#EAF0F4;
+  --mu:#9DAAB6; --bd:#2C3843; --ac:#4FC3C3; --acs:#12393A; --ai:#B7A3FF; --ais:#2A2148; --wn:#FF9A9A; --wns:#3D1A1A;
+  --s1:#3987e5; --s2:#d95926; --neu:#3A4652; --band:#3A2214; } }
+:root[data-theme="dark"] { --bg:#0F1418; --sf:#182028; --tx:#EAF0F4; --mu:#9DAAB6; --bd:#2C3843; --ac:#4FC3C3;
+  --acs:#12393A; --ai:#B7A3FF; --ais:#2A2148; --wn:#FF9A9A; --wns:#3D1A1A; --s1:#3987e5; --s2:#d95926; --neu:#3A4652; --band:#3A2214; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--tx); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--ac); }
+header { background: var(--sf); border-bottom: 1px solid var(--bd); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
+header b { font-size: 18px; }
+nav { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; }
+main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 64px; }
+h1 { font-size: 26px; margin: 8px 0 4px; } h2 { font-size: 21px; margin: 40px 0 4px; } h3 { font-size: 16px; margin: 20px 0 6px; }
+p { margin: 6px 0; } .mu, small { color: var(--mu); } small { font-size: 13px; }
+.tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--ais); color: var(--ai); margin: 0 4px 2px 0; max-width: 100%; overflow-wrap: anywhere; }
+.tag.plain { background: none; border: 1px solid var(--bd); color: var(--mu); }
+.tag.warn { background: var(--wns); color: var(--wn); }
+.tag.ok { background: var(--acs); color: var(--ac); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
+.stats div { border-top: 3px solid var(--ac); padding-top: 6px; }
+.stats b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
+.stats span { color: var(--mu); font-size: 14px; }
+ul.list { padding-left: 20px; margin: 8px 0; } ul.list li { margin: 6px 0; }
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px 24px; }
+.item { border-top: 1px solid var(--bd); padding: 10px 0; overflow-wrap: anywhere; }
+.q { margin: 2px 0; } .meta { font-size: 13px; color: var(--mu); display: flex; gap: 4px 10px; flex-wrap: wrap; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--mu); margin: 6px 0; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.row { display: grid; grid-template-columns: minmax(90px, 200px) 1fr; gap: 4px 12px; align-items: center; font-size: 14px; }
+.row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb { display: flex; align-items: center; gap: 6px; padding: 2px 0; } .hb i { display: block; height: 10px; border-radius: 0 4px 4px 0; min-width: 2px; }
+.hb em { font-style: normal; font-size: 12px; color: var(--mu); font-variant-numeric: tabular-nums; }
+.div { position: relative; height: 14px; } .div::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; border-left: 1px solid var(--mu); }
+.div i { position: absolute; top: 2px; height: 10px; }
+.stack { display: flex; height: 14px; gap: 2px; border-radius: 4px; overflow: hidden; margin: 6px 0; } .stack i { display: block; }
+.cols { display: flex; align-items: flex-end; gap: 2px; height: 120px; border-bottom: 1px solid var(--bd); overflow-x: auto; }
+.cols .c { flex: 1 0 6px; display: flex; flex-direction: column-reverse; gap: 2px; height: 100%; } .cols .c i { display: block; }
+.axis { display: flex; justify-content: space-between; font-size: 12px; color: var(--mu); }
+.tw { overflow-x: auto; } table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--bd); vertical-align: top; overflow-wrap: anywhere; }
+th { color: var(--mu); font-weight: 600; white-space: nowrap; } td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+details { margin: 8px 0; } summary { cursor: pointer; color: var(--mu); font-size: 14px; }
+svg text { fill: var(--mu); font-size: 11px; }
+.tip { position: fixed; pointer-events: none; background: var(--tx); color: var(--sf); font-size: 13px; padding: 6px 8px; border-radius: 6px; max-width: 280px; z-index: 10; display: none; }
+.pill { font: inherit; font-size: 13px; border: 1px solid var(--bd); background: var(--sf); color: var(--tx); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+.pill[aria-pressed="true"] { background: var(--acs); color: var(--ac); border-color: var(--ac); font-weight: 600; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+input[type=search], select { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid var(--bd); border-radius: 8px; background: var(--sf); color: var(--tx); }
+input[type=search] { flex: 1 1 200px; min-width: 0; }
+.qrow { display: grid; grid-template-columns: 22px 1fr; gap: 6px; border-top: 1px solid var(--bd); padding: 8px 0; }
+.toc { font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <b>Civic Signal · Insights</b>
+  <nav><a href="/">← Back to triage</a><a href="/ui/">Team app</a><a href="/docs#/insights">API</a></nav>
+</header>
+<main>
+  <h1>What the transcripts say, taken together</h1>
+  <p class="mu">Every public video in the dataset, read as a whole rather than one ticket at a time. Labels marked <span class="tag">computed</span> come from keyword rules and statistics, not from people or an AI model. <span id="srcNote"></span></p>
+  <div class="bar" id="srcChips" role="group" aria-label="Data source"></div>
+  <div class="toc"><a href="#thinking">What people think</a><a href="#blind">Blind spots</a><a href="#plan">Engagement plan</a><a href="#anatomy">Trend anatomy</a><a href="#echoes">Echoes</a><a href="#voices">Voices</a><a href="#quotes">Quote bank</a><a href="#caveats">Caveats</a></div>
+  <div class="stats" id="tiles"></div>
+  <h3>Headlines <span class="tag">computed</span></h3>
+  <ul class="list" id="headlines"><li class="mu">Loading…</li></ul>
+
+  <h2 id="thinking">1. What people are thinking</h2>
+  <p class="mu" id="sentMethod"></p>
+  <div class="legend"><span><i style="background:var(--s2)"></i>negative</span><span><i style="background:var(--neu)"></i>neutral or mixed</span><span><i style="background:var(--s1)"></i>positive</span></div>
+  <div id="toneOverall"></div>
+  <div class="cols2">
+    <div><h3>Tone by topic (mean, −1 to +1)</h3><div id="toneTheme"></div></div>
+    <div><h3>Tone by kind of video</h3><div id="toneGenre"></div></div>
+  </div>
+  <h3>Emotional register</h3>
+  <div class="cols2" id="registers"></div>
+  <details><summary>Most negative and most positive videos (check these by hand)</summary><div class="cols2"><div id="mostNeg"></div><div id="mostPos"></div></div></details>
+
+  <h2 id="blind">2. Blind spots: what residents raise that 311 misses</h2>
+  <p class="mu">For the Office of Mass Engagement. <span id="blindSummary"></span></p>
+  <div class="cols2" id="gaps"></div>
+  <h3>Topics residents raise that have no 311 form</h3>
+  <div class="tw"><table id="unmet"></table></div>
+  <div class="cols2">
+    <div><h3>“We already called 311”</h3><p class="mu">People saying the formal channel already failed them.</p><div id="tried"></div></div>
+    <div><h3>Quiet but serious</h3><p class="mu">High severity cues, fewer views than the median video.</p><div id="quiet"></div></div>
+  </div>
+  <h3>Attention against severity</h3>
+  <p class="mu">Each dot is a service ask. Shaded corner: serious but unseen. Click a dot to open the video.</p>
+  <div class="legend"><span><i style="background:var(--s1)"></i>in NYC</span><span><i style="background:var(--s2)"></i>outside NYC or place unknown</span></div>
+  <svg id="scatter" width="100%" height="280" role="img" aria-label="Service asks: views against severity score"></svg>
+  <p class="mu"><small id="sevMethod"></small></p>
+
+  <h2 id="plan">3. Engagement plan: where to show up, what to answer</h2>
+  <p class="mu">For the Office of Mass Engagement. <small id="planMethod"></small></p>
+  <h3>Respond publicly <span class="tag">computed priority</span></h3>
+  <div id="respond"></div>
+  <div class="cols2">
+    <div><h3>Where to show up</h3><p class="mu" id="boroughs"></p><div class="tw"><table id="showUp"></table></div></div>
+    <div><h3>Community events people mention</h3><div id="events"></div></div>
+  </div>
+  <h3>Which communities come up</h3>
+  <p class="mu">Videos that <em>mention</em> a community, with the average tone of those videos. Nobody is labelled. <span id="langs"></span></p>
+  <div class="tw"><table id="communities"></table></div>
+
+  <h2 id="anatomy">4. Anatomy of the trend</h2>
+  <p class="mu">What kind of video is each post, and where does attention go?</p>
+  <div class="legend"><span><i style="background:var(--s1)"></i>share of videos</span><span><i style="background:var(--s2)"></i>share of views</span></div>
+  <div id="genreBars"></div>
+  <details><summary>Genre definitions as a table</summary><div class="tw" id="genreTable"></div></details>
+  <div class="cols2">
+    <div><h3>Posts per day</h3><div class="legend"><span><i style="background:var(--s2)"></i>asks</span><span><i style="background:var(--s1)"></i>everything else</span></div><div class="cols" id="timeline"></div><div class="axis" id="timelineAxis"></div></div>
+    <div><h3>Which hashtags carry real asks?</h3><div class="tw" id="tagYield"></div></div>
+  </div>
+  <h3>Every ask, by whether 311 can take it</h3>
+  <p class="mu" id="agreeNote"></p>
+  <div class="cols2" id="fitGap"></div>
+  <details><summary>All themes across every video</summary><div class="cols2" id="themes"></div><p class="mu" id="unthemed"></p></details>
+
+  <h2 id="echoes">5. Echoes: stories, repeats and closures</h2>
+  <p class="mu"><small id="echoMethod"></small></p>
+  <h3>Story waves</h3>
+  <div class="legend"><span><i style="background:var(--s1)"></i>news or official</span><span><i style="background:var(--s2)"></i>residents and others</span></div>
+  <div class="cols2" id="waves"></div>
+  <div class="cols2">
+    <div><h3>“He fixed it”: closing the loop</h3><p class="mu">Candidate links share a theme and come earlier in time. A person must confirm each one.</p><div id="closures"></div></div>
+    <div><h3>Same issue, different people</h3><div id="sameIssue"></div>
+      <h3>Near-identical scripts</h3><p class="mu">The same words from different accounts. Don't count them as independent voices. This is not proof of coordination.</p><div id="dups"></div></div>
+  </div>
+
+  <h2 id="voices">6. Who is speaking (self-described only)</h2>
+  <p class="mu" id="voiceNote"></p>
+  <div id="coverage"></div>
+  <div class="tw" id="cues"></div>
+
+  <h2 id="quotes">7. Quote bank for memos</h2>
+  <p class="mu">Real quotes linked to their sources. Filter, tick, then copy them with citations.</p>
+  <div class="bar">
+    <input type="search" id="qSearch" placeholder="Search quotes" aria-label="Search quotes">
+    <select id="qTheme" aria-label="Theme"></select><select id="qGenre" aria-label="Genre"></select>
+    <button class="pill" id="qCopy">Copy selected</button>
+  </div>
+  <div id="quoteList" style="max-height:560px;overflow:auto"></div>
+
+  <h2 id="caveats">Caveats</h2>
+  <ol class="mu" id="caveatList" style="font-size:14px"></ol>
+  <p class="mu"><small id="metaLine"></small></p>
+</main>
+<div class="tip" id="tip" role="tooltip"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (n ?? 0).toLocaleString();
+const compact = n => Intl.NumberFormat(undefined, {notation: 'compact', maximumFractionDigits: 1}).format(n || 0);
+const pct = x => `${Math.round((x || 0) * 100)}%`;
+const day = iso => iso ? new Date(iso).toLocaleDateString(undefined, {month: 'short', day: 'numeric'}) : '—';
+const sign = x => (x > 0 ? '+' : '') + (x ?? 0).toFixed(2);
+const FIT = { app: ['ok', 'app drafts a 311'], '311': ['warn', '311 form exists, not drafted'], none: ['plain', 'no 311 path'] };
+const ASK = new Set(['service_ask', 'service_ask_elsewhere', 'visual_ask', 'personal_ask']);
+let D, source = new URLSearchParams(location.search).get('source') || 'auto', TL = {}, GL = {};
+
+const tip = $('#tip');
+document.addEventListener('mouseover', e => { const t = e.target.closest('[data-tip]'); if (t) { tip.innerHTML = t.dataset.tip; tip.style.display = 'block'; } });
+document.addEventListener('mousemove', e => { if (tip.style.display === 'block') { tip.style.left = Math.min(e.clientX + 12, innerWidth - 290) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; } });
+document.addEventListener('mouseout', e => { if (e.target.closest('[data-tip]')) tip.style.display = 'none'; });
+
+const item = (c, extra = '') => !c ? '' : `<div class="item"><div class="q">“${esc(c.quote || '(no quotable text; the problem is only on screen)')}”</div>
+  <div class="meta"><a href="${esc(c.url)}" target="_blank" rel="noopener">@${esc(c.handle)} ↗</a><span>${day(c.posted_at)}</span><span>${fmt(c.views)} views</span>${extra}</div></div>`;
+const list = (arr, f = c => item(c), empty = 'None found in this dataset.') => arr && arr.length ? arr.map(f).join('') : `<p class="mu">${empty}</p>`;
+const table = (head, rows) => `<thead><tr>${head.map(h => `<th class="${h.startsWith('#') ? 'n' : ''}">${esc(h.replace(/^#/, ''))}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody>`;
+const divBar = m => { const w = Math.min(Math.abs(m), 1) * 50; return `<div class="div" data-tip="mean tone ${sign(m)}"><i style="${m >= 0 ? `left:50%;width:${w}%;background:var(--s1);border-radius:0 4px 4px 0` : `right:50%;width:${w}%;background:var(--s2);border-radius:4px 0 0 4px`}"></i></div>`; };
+
+function render() {
+  const m = D.meta; TL = m.themes; GL = m.genres;
+  $('#srcNote').textContent = `Source: ${m.source}, ${m.records} videos, ${day(m.from)} to ${day(m.to)}.`;
+  $('#srcChips').innerHTML = [['auto', 'Auto'], ['db', 'Live database'], ['corpus', 'Cached corpus']].map(([s, l]) => `<button class="pill" data-src="${s}" aria-pressed="${s === source}">${l}</button>`).join('');
+  document.querySelectorAll('[data-src]').forEach(b => b.onclick = () => { source = b.dataset.src; history.replaceState(null, '', source === 'auto' ? '/insights' : `/insights?source=${source}`); load(); });
+  $('#tiles').innerHTML = D.overview.tiles.map(t => `<div><b>${t.format === 'compact' ? compact(t.value) : t.format === 'pct' ? t.value + '%' : fmt(t.value)}</b><span>${esc(t.label)}</span></div>`).join('');
+  $('#headlines').innerHTML = D.overview.headlines.map(h => `<li>${esc(h)}</li>`).join('') || '<li class="mu">Not enough data yet.</li>';
+  renderSentiment(); renderBlind(); renderPlan(); renderAnatomy(); renderEchoes(); renderVoices(); renderQuoteFilters();
+  $('#caveatList').innerHTML = m.caveats.map(c => `<li>${esc(c)}</li>`).join('');
+  $('#metaLine').textContent = `Method: ${m.method}. ${m.llm_note} Computed ${new Date(m.computed_at).toLocaleString()}.`;
+}
+
+function renderSentiment() {
+  const S = D.sentiment, o = S.overall, n = o.n || 1;
+  $('#sentMethod').textContent = `${S.method} ${S.caveat}`;
+  $('#toneOverall').innerHTML = `<div class="stack" data-tip="${o.negative} negative · ${o.neutral} neutral · ${o.mixed} mixed · ${o.positive} positive">
+    <i style="flex:${o.negative || .001};background:var(--s2)"></i><i style="flex:${(o.neutral + o.mixed) || .001};background:var(--neu)"></i><i style="flex:${o.positive || .001};background:var(--s1)"></i></div>
+    <p>${pct(o.positive / n)} positive, ${pct(o.negative / n)} negative, ${pct((o.neutral + o.mixed) / n)} neutral or mixed across ${o.n} videos (mean ${sign(o.mean)}).${S.asks ? ` Among asks: ${pct(S.asks.positive / (S.asks.n || 1))} positive, ${pct(S.asks.negative / (S.asks.n || 1))} negative. Asking the mayor for help is often hopeful, not angry.` : ''}</p>`;
+  const rows = (arr, key) => `<div class="row">${arr.map(r => `<span title="${esc(r.label)}">${esc(r.label)} <small>(${r.n})</small></span>${divBar(r.mean)}`).join('')}</div>`;
+  $('#toneTheme').innerHTML = rows(S.by_theme);
+  $('#toneGenre').innerHTML = rows(S.by_genre);
+  $('#registers').innerHTML = S.registers.map(r => `<div><h3>${esc(r.label)}: ${r.count} videos <small>(${pct(r.share)})</small></h3>${list(r.quotes.slice(0, 3), c => item(c, `<span class="tag">${esc(c.matched.slice(0, 3).join(', '))}</span>`))}</div>`).join('');
+  const tc = c => item(c, `<span class="tag">${sign(c.compound)}</span><span>${esc([...c.neg_words, ...c.pos_words].slice(0, 5).join(', '))}</span>`);
+  $('#mostNeg').innerHTML = '<h3>Most negative</h3>' + list(S.most_negative, tc);
+  $('#mostPos').innerHTML = '<h3>Most positive</h3>' + list(S.most_positive, tc);
+}
+
+function renderBlind() {
+  const B = D.blind_spots, s = B.summary;
+  $('#blindSummary').textContent = `Of ${s.nyc_asks} asks from NYC, only ${s.routable_to_311} map to a 311 request the app can draft today. ${s.not_routable} (${pct(s.share_not_routable)}) would fall through a 311-only pipeline. ${s.tried_official_channels} say they already tried 311; ${s.outside_nyc} are from outside NYC and aren't counted.`;
+  $('#gaps').innerHTML = B.gaps.map(g => `<div><h3>${g.count} · ${esc(g.label)}</h3><p class="mu">${esc(g.why_it_matters)}</p>${list(g.items.slice(0, 3), c => item(c, c.sr_hint ? `<span class="tag">${esc(c.sr_hint)}</span>` : ''))}</div>`).join('');
+  $('#unmet').innerHTML = table(['Topic', '#Asks', '#Resident videos', '#Views', 'Route', 'Example'], B.unmet_themes.map(u =>
+    `<tr><td>${esc(u.label)}</td><td class="n">${u.asks}</td><td class="n">${u.resident_videos}</td><td class="n">${compact(u.views)}</td><td><span class="tag ${FIT[u.fit][0]}">${esc(u.route_hint)}</span></td><td>${u.quotes[0] ? `<a href="${esc(u.quotes[0].url)}" target="_blank" rel="noopener">@${esc(u.quotes[0].handle)}</a>: “${esc((u.quotes[0].quote || '').slice(0, 110))}”` : ''}</td></tr>`));
+  $('#tried').innerHTML = list(B.tried_official_channels, c => item(c, `<span class="tag">“${esc(c.said.join('”, “'))}”</span>`));
+  const why = c => Object.entries(c.severity_why || {}).map(([k, v]) => `<span class="tag">${esc(k.replace('_', ' '))}: ${esc(v.slice(0, 2).join(', '))}</span>`).join('');
+  $('#quiet').innerHTML = list(B.quiet_but_serious.slice(0, 6), c => item(c, `<span class="tag warn">severity ${c.severity}</span>${why(c)}`));
+  $('#sevMethod').textContent = `Severity score: ${D.attention.severity_method} Median video: ${fmt(D.attention.corpus_median_views)} views.`;
+  scatter(); window.onresize = scatter;
+}
+
+function renderPlan() {
+  const P = D.engagement_plan;
+  $('#planMethod').textContent = P.method;
+  const kinds = { unanswered_ask: ['warn', 'Unanswered ask'], amplify_fix: ['ok', 'Amplify a fix'], claim_check: ['plain', 'Check a claim'], narrative: ['', 'Join a conversation'] };
+  $('#respond').innerHTML = list(P.respond_publicly.slice(0, 12), q => { const [cls, lbl] = kinds[q.kind];
+    if (q.kind === 'narrative') return `<div class="item"><span class="tag ${cls}">${lbl}</span> <b>${esc(q.label)}</b><div class="meta"><span>${q.videos} videos · ${q.creators} creators · ${compact(q.views)} views · tone ${sign(q.mean_tone)}</span></div><p class="mu">${esc(q.reason)}</p>${q.examples.slice(0, 2).map(e => `<div class="meta"><a href="${esc(e.url)}" target="_blank" rel="noopener">@${esc(e.handle)} ↗</a><span>“${esc((e.quote || '').slice(0, 120))}”</span></div>`).join('')}</div>`;
+    return `<div class="item"><span class="tag ${cls}">${lbl}</span> “${esc(q.quote || '(on-screen only)')}”<div class="meta"><a href="${esc(q.url)}" target="_blank" rel="noopener">@${esc(q.handle)} ↗</a><span>${fmt(q.views)} views</span><span>${day(q.posted_at)}</span></div><p class="mu">${esc(q.reason)}</p></div>`; });
+  $('#boroughs').textContent = 'Asks by borough: ' + Object.entries(P.boroughs).map(([b, n]) => `${b} ${n}`).join(' · ') + '. Most posts name no place.';
+  $('#showUp').innerHTML = table(['Place', '#Asks', '#Severity', 'Example'], P.show_up.filter(s => s.place !== 'place not stated').slice(0, 10).map(s =>
+    `<tr><td>${esc(s.place === s.borough ? 'Somewhere in ' + s.borough : s.place)}<br><small>${esc(s.borough)}</small></td><td class="n">${s.asks}</td><td class="n">${s.max_severity}</td><td><a href="${esc(s.examples[0].url)}" target="_blank" rel="noopener">@${esc(s.examples[0].handle)}</a>: “${esc((s.examples[0].quote || '').slice(0, 90))}”</td></tr>`));
+  $('#events').innerHTML = list(P.events.slice(0, 5), c => item(c, `<span class="tag">${esc(c.event_words.join(', '))}</span>${c.dates_mentioned.length ? `<span class="tag ok">${esc(c.dates_mentioned.join(', '))}</span>` : ''}`));
+  $('#langs').textContent = `Speech languages: ${Object.entries(P.languages).map(([k, v]) => `${k} ${v}`).join(', ')}. ${P.non_english_speech} non-English, which probably reflects the English hashtags searched.`;
+  $('#communities').innerHTML = table(['Community mentioned', '#Videos', '#Creators', '#Mean tone', 'Top topics', 'Example'], P.communities.map(c =>
+    `<tr><td>${esc(c.community)}</td><td class="n">${c.videos}</td><td class="n">${c.creators}</td><td class="n">${sign(c.mean_tone)}</td><td>${esc(c.top_themes.join(', '))}</td><td>${c.examples[0] ? `<a href="${esc(c.examples[0].url)}" target="_blank" rel="noopener">@${esc(c.examples[0].handle)}</a>` : ''}</td></tr>`));
+}
+
+function renderAnatomy() {
+  const rows = D.genres.rows.filter(r => r.count), gmax = Math.max(...rows.flatMap(r => [r.share_of_videos, r.share_of_views]), .01);
+  $('#genreBars').innerHTML = `<div class="row">${rows.map(r => `<span title="${esc(r.desc)}">${r.is_ask ? '● ' : ''}${esc(r.label)}</span><div>
+    <div class="hb" data-tip="${r.count} videos"><i style="width:${r.share_of_videos / gmax * 85}%;background:var(--s1)"></i><em>${pct(r.share_of_videos)}</em></div>
+    <div class="hb" data-tip="${fmt(r.views)} views · median ${fmt(r.median_views)}"><i style="width:${r.share_of_views / gmax * 85}%;background:var(--s2)"></i><em>${pct(r.share_of_views)}</em></div></div>`).join('')}</div><p class="mu"><small>● marks an ask genre.</small></p>`;
+  $('#genreTable').innerHTML = `<table>${table(['Genre', 'Definition', '#Videos', '#Median views', '#Low confidence'], D.genres.rows.map(r => `<tr><td>${esc(r.label)}</td><td>${esc(r.desc)}</td><td class="n">${r.count}</td><td class="n">${fmt(r.median_views)}</td><td class="n">${r.low_confidence}</td></tr>`))}</table>`;
+  const tl = D.genres.timeline.slice(-45), tmax = Math.max(1, ...tl.map(d => d.total));
+  $('#timeline').innerHTML = tl.map(d => { const a = Object.entries(d.counts).filter(([k]) => ASK.has(k)).reduce((s, [, v]) => s + v, 0), o = d.total - a;
+    return `<div class="c" data-tip="${day(d.date + 'T12:00:00')}: ${a} asks, ${o} other"><i style="height:${o / tmax * 100}%;background:var(--s1)"></i><i style="height:${a / tmax * 100}%;background:var(--s2);border-radius:3px 3px 0 0"></i></div>`; }).join('');
+  $('#timelineAxis').innerHTML = tl.length ? `<span>${day(tl[0].date + 'T12:00:00')}</span><span>peak ${tmax} a day</span><span>${day(tl.at(-1).date + 'T12:00:00')}</span>` : '';
+  $('#tagYield').innerHTML = `<table>${table(['Tag', '#Videos', '#NYC asks', '#Yield'], D.genres.hashtag_yield.map(t => `<tr><td>${esc(t.tag)}</td><td class="n">${t.videos}</td><td class="n">${t.nyc_service_asks}</td><td class="n">${pct(t.yield)}</td></tr>`))}</table><p class="mu"><small>Yield = share that are NYC service asks. Basis: ${esc(D.genres.hashtag_basis)}.</small></p>`;
+  const ag = D.genres.agreement;
+  $('#agreeNote').textContent = ag ? `Cross-check: of videos labelled "fix_request" at ingest, these rules call ${pct(ag.fix_requests_we_call_asks)} asks. Disagreements are worth a look.` : '';
+  $('#fitGap').innerHTML = D.themes.fit_gap.map(b => `<div><h3>${b.count} · ${esc(b.label)}</h3>${list(b.items.slice(0, 2))}${b.items.length > 2 ? `<details><summary>${b.items.length - 2} more</summary>${list(b.items.slice(2, 25))}</details>` : ''}</div>`).join('');
+  $('#themes').innerHTML = D.themes.rows.map(t => `<div><h3>${esc(t.label)} <span class="tag ${FIT[t.fit][0]}">${FIT[t.fit][1]}</span></h3><p class="mu"><small>${t.videos} videos · ${t.creators} creators · ${t.asks} asks · ${compact(t.views)} views</small></p>${item(t.quotes[0])}</div>`).join('');
+  const u = D.themes.unthemed; $('#unthemed').textContent = u.count ? `${u.count} videos matched no theme. Their recurring words: ${u.top_terms.join(', ')}.` : '';
+}
+
+function renderEchoes() {
+  const E = D.echoes;
+  $('#echoMethod').textContent = `${E.method} ${E.loose_waves} looser clusters are hidden.`;
+  $('#waves').innerHTML = list(E.waves.slice(0, 8), w => `<div class="item"><b>${esc(w.label)}</b><div class="meta"><span>${w.videos} videos · ${w.creators} creators · ${compact(w.views)} views · over ${w.span_hours < 72 ? Math.round(w.span_hours) + 'h' : Math.round(w.span_hours / 24) + ' days'} · first @${esc(w.first_by)}</span></div>
+    <div class="stack" data-tip="${w.news_or_official} news or official · ${w.residents_and_others} others"><i style="flex:${w.news_or_official || .001};background:var(--s1)"></i><i style="flex:${w.residents_and_others || .001};background:var(--s2)"></i></div>
+    <details><summary>Videos</summary>${list(w.members, c => item(c, `<span class="tag">${esc(GL[c.genre])}</span>`))}</details></div>`);
+  $('#closures').innerHTML = list(E.closures.slice(0, 8), c => item(c, `<span class="tag ok">${esc((c.said || []).join(', '))}</span>`) +
+    (c.candidate_asks.length ? c.candidate_asks.map(a => `<div class="meta">↳ possible earlier ask <span class="tag warn">unconfirmed</span><a href="${esc(a.url)}" target="_blank" rel="noopener">@${esc(a.handle)}</a><span>${day(a.posted_at)}</span></div>`).join('') : '<div class="meta">No earlier ask in this dataset matches it.</div>'), 'No "it got fixed" videos yet.');
+  $('#sameIssue').innerHTML = list(E.same_issue.slice(0, 5), g => `<div class="item"><b>${esc(g.label)}</b>: ${g.videos} videos from ${g.creators} creators, ${day(g.first_at)} to ${day(g.last_at)}<div class="meta">${esc(g.places.map(p => p.split(',')[0]).join(' · ') || 'places unknown')}</div></div>`);
+  $('#dups').innerHTML = list(E.duplicates.slice(0, 5), d => `<div class="item">“${esc(d.quote || '')}”<div class="meta"><span>${d.videos} videos · ${d.creators} accounts</span>${d.members.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">@${esc(x.handle)}</a>`).join('')}</div></div>`);
+}
+
+function renderVoices() {
+  const V = D.voices, cv = V.coverage, tot = (cv.with_speech + cv.on_screen_text_only + cv.caption_only) || 1;
+  $('#voiceNote').textContent = V.note;
+  $('#coverage').innerHTML = `<div class="legend"><span><i style="background:var(--s1)"></i>has spoken words (TikTok auto-captions)</span><span><i style="background:var(--s2)"></i>on-screen text or caption only</span></div>
+    <div class="stack"><i style="flex:${cv.with_speech || .001};background:var(--s1)"></i><i style="flex:${(tot - cv.with_speech) || .001};background:var(--s2)"></i></div>
+    <p>${pct(cv.with_speech / tot)} of videos have speech captions. ${V.asks_without_speech} of ${V.asks} asks have none, so the problem is only in the picture. ${V.location_tagged} posts carry a location tag.</p>`;
+  $('#cues').innerHTML = V.cues.length ? `<table>${table(['Self-description', '#Videos', 'Their words'], V.cues.map(c => `<tr><td>${esc(c.label)}</td><td class="n">${c.count}</td><td>${c.examples.slice(0, 2).map(e => `<a href="${esc(e.url)}" target="_blank" rel="noopener">@${esc(e.handle)}</a>: “${esc(e.matched.join('”, “'))}”`).join('<br>')}</td></tr>`))}</table>` : '<p class="mu">None found.</p>';
+}
+
+function renderQuoteFilters() {
+  $('#qTheme').innerHTML = '<option value="">All themes</option>' + Object.entries(TL).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+  $('#qGenre').innerHTML = '<option value="">All kinds</option>' + Object.entries(GL).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+  renderQuotes();
+}
+function renderQuotes() {
+  const s = $('#qSearch').value.toLowerCase(), th = $('#qTheme').value, g = $('#qGenre').value, all = D.quotes.items;
+  const items = all.filter(q => (!th || q.themes.includes(th)) && (!g || q.genre === g) && (!s || (q.quote + ' ' + q.handle).toLowerCase().includes(s)));
+  $('#quoteList').innerHTML = items.length ? items.slice(0, 150).map(q => `<label class="qrow"><input type="checkbox" data-qi="${all.indexOf(q)}"><div>“${esc(q.quote)}”
+    <div class="meta"><a href="${esc(q.url)}" target="_blank" rel="noopener">@${esc(q.handle)} ↗</a><span>${day(q.posted_at)}</span><span>${fmt(q.views)} views</span><span class="tag">${esc(q.genre_label)}</span></div></div></label>`).join('') + (items.length > 150 ? `<p class="mu">Showing 150 of ${items.length}.</p>` : '') : '<p class="mu">No quotes match.</p>';
+}
+['#qSearch', '#qTheme', '#qGenre'].forEach(s => $(s).addEventListener('input', renderQuotes));
+$('#qCopy').onclick = () => {
+  const picked = [...document.querySelectorAll('[data-qi]:checked')].map(c => D.quotes.items[+c.dataset.qi]);
+  const say = t => { $('#qCopy').textContent = t; setTimeout(() => $('#qCopy').textContent = 'Copy selected', 1500); };
+  if (!picked.length) return say('Tick quotes first');
+  navigator.clipboard.writeText(picked.map(q => `"${q.quote}" (@${q.handle}, TikTok, ${day(q.posted_at)}, ${q.url})`).join('\n')).then(() => say(`Copied ${picked.length}`), () => say('Copy blocked'));
+};
+
+function scatter() {
+  const svg = $('#scatter'), W = svg.clientWidth || 600, H = 280, P = {l: 36, r: 10, t: 10, b: 32}, items = D.attention.items;
+  if (!items.length) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle">No service asks yet</text>`; return; }
+  const lv = v => Math.log10(Math.max(v, 10)), xmin = 1, xmax = Math.max(4, Math.ceil(Math.max(...items.map(i => lv(i.views)))));
+  const ymax = Math.max(4, Math.ceil(Math.max(...items.map(i => i.severity))));
+  const X = v => P.l + (lv(v) - xmin) / (xmax - xmin) * (W - P.l - P.r), Y = s => H - P.b - s / ymax * (H - P.t - P.b), med = D.attention.corpus_median_views;
+  let g = `<rect x="${P.l}" y="${P.t}" width="${Math.max(0, X(med) - P.l)}" height="${Math.max(0, Y(2) - P.t)}" fill="var(--band)"/><text x="${P.l + 6}" y="${P.t + 14}">quiet but serious</text>`;
+  for (let e = xmin; e <= xmax; e++) g += `<line x1="${X(10 ** e)}" x2="${X(10 ** e)}" y1="${P.t}" y2="${H - P.b}" stroke="var(--bd)"/><text x="${X(10 ** e)}" y="${H - P.b + 14}" text-anchor="middle">${compact(10 ** e)}</text>`;
+  for (let s = 0; s <= ymax; s += 2) g += `<line x1="${P.l}" x2="${W - P.r}" y1="${Y(s)}" y2="${Y(s)}" stroke="var(--bd)"/><text x="${P.l - 6}" y="${Y(s) + 4}" text-anchor="end">${s}</text>`;
+  g += `<line x1="${X(med)}" x2="${X(med)}" y1="${P.t}" y2="${H - P.b}" stroke="var(--mu)" stroke-dasharray="3 3"/><text x="${X(med) + 4}" y="${H - P.b - 6}">median video</text>`;
+  g += `<text x="${(W + P.l) / 2}" y="${H - 3}" text-anchor="middle">views (log scale)</text><text transform="translate(10 ${(H - P.b + P.t) / 2}) rotate(-90)" text-anchor="middle">severity</text>`;
+  items.forEach((i, k) => { const cx = X(i.views), cy = Y(Math.max(0, i.severity + ((k * 37) % 11 - 5) * .05));
+    const t = `<b>@${esc(i.handle)}</b> · ${fmt(i.views)} views · severity ${i.severity}<br>${esc((i.quote || '').slice(0, 140))}`;
+    g += `<a href="${esc(i.url)}" target="_blank" rel="noopener"><circle cx="${cx}" cy="${cy}" r="11" fill="transparent" data-tip="${esc(t)}"/><circle cx="${cx}" cy="${cy}" r="5" fill="${i.in_nyc ? 'var(--s1)' : 'var(--s2)'}" stroke="var(--sf)" stroke-width="2" pointer-events="none"/></a>`; });
+  svg.innerHTML = g;
+}
+
+async function load() {
+  $('#headlines').innerHTML = '<li class="mu">Computing…</li>';
+  try {
+    const r = await fetch(`/api/insights?source=${source}`); D = await r.json();
+    if (!r.ok) throw new Error(D.error || r.status);
+    render();
+  } catch (e) { $('#headlines').innerHTML = `<li class="mu">Could not load insights: ${esc(e.message)}</li>`; }
+}
+load();
+</script>
+</body>
+</html>

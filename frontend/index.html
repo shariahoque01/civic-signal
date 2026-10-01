@@ -1,13 +1,52 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Civic Signal</title>
-<link rel="stylesheet" href="styles.css">
+<title>Mamdani, Fix This</title>
+<meta name="description" content="What New Yorkers are asking the mayor to fix: public videos turned into 311 work orders and engagement insights.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='12' cy='16' r='9' fill='%23f9b31b'/%3E%3Ccircle cx='20' cy='16' r='9' fill='%231f3fd1'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css?v=4">
 </head><body>
-<header><span class="brand">Civic Signal</span>
-<nav id="nav"><button data-s="intake">1 Intake</button><button data-s="review">2 Case review</button><button data-s="inbox">3 Inbox / Tracker</button></nav>
-<small style="margin-left:auto" id="modeBadge"></small></header>
+<header><span class="brand">Mamdani, Fix This</span>
+<nav id="nav"><button data-s="home">Overview</button><button data-s="inbox">311</button><button data-s="sentiment">Sentiment</button><button data-s="ome1">What 311 misses</button><button data-s="ome2">Where to show up</button><button data-s="videos">Videos</button><button data-s="intake">Add</button></nav>
+<small style="margin-left:auto" id="modeBadge"></small><small id="snapNote" class="mu" style="margin-left:auto"></small></header>
 <main>
+
+<section id="home">
+<div class="hero">
+  <p class="eyebrow">#MamdaniFixThis · past 7 days</p>
+  <h1>What New Yorkers are asking the mayor to <em>fix</em></h1>
+  <p class="lede">Public videos tagging the mayor, read and sorted into work the city can act on.</p>
+</div>
+<div class="bigstats" id="homeStats"></div>
+
+<div class="sechead"><h2>Most-watched requests</h2><a href="#" onclick="go('videos');return false">All videos →</a></div>
+<div class="vgrid" id="homeGrid"></div>
+
+<div class="links">
+  <button class="linkrow" onclick="go('inbox')"><span class="n">01</span><span><b>311 work orders</b><span class="d" id="bb311">Draft service requests and where to route them</span></span><span class="arr">→</span></button>
+  <button class="linkrow" onclick="go('sentiment')" id="bbSent"><span class="n">02</span><span><b>What people are thinking</b><span class="d">Tone and themes across every transcript</span></span><span class="arr">→</span></button>
+  <button class="linkrow" onclick="go('ome1')"><span class="n">03</span><span><b>What 311 misses</b><span class="d" id="bbOme1">Requests the official pipeline can't capture</span></span><span class="arr">→</span></button>
+  <button class="linkrow" onclick="go('ome2')"><span class="n">04</span><span><b>Where to show up</b><span class="d">Places, public replies and communities, for the Office of Mass Engagement</span></span><span class="arr">→</span></button>
+</div>
+</section>
+
+<section id="sentiment"><div class="phead"><p class="eyebrow">02 · Sentiment</p><h1>What people are thinking</h1><p class="lede">Tone and feelings across every transcript, caption and on-screen text.</p></div><div id="sentimentBody"></div></section>
+<section id="ome1"><div class="phead"><p class="eyebrow">03 · For the Office of Mass Engagement</p><h1>What 311 misses</h1><p class="lede">Requests the official pipeline can't capture, and people who say it already failed them.</p></div><div id="ome1Body"></div></section>
+<section id="ome2"><div class="phead"><p class="eyebrow">04 · For the Office of Mass Engagement</p><h1>Where to show up</h1><p class="lede">Places to visit, videos worth a public reply, and the communities speaking up.</p></div><div id="ome2Body"></div></section>
+
+<section id="videos">
+<div class="top"><div><h2>This week's videos</h2><p class="mu" style="margin:6px 0 0">Public TikTok and Instagram posts tagging the mayor, gathered from #mamdanifixthis and related tags. Only public post details are stored.</p></div>
+<div class="seg" id="daysSeg"><span data-days="7" class="s">7 days</span><span data-days="30">30 days</span><span data-days="365">All</span></div></div>
+<div class="grid g4" style="margin-bottom:20px" id="vTiles"></div>
+<div class="grid g2" style="margin-bottom:20px">
+  <div class="card"><h3>Posts per day</h3><div id="vByDay" class="hbars"></div></div>
+  <div class="card"><h3>Top hashtags</h3><div id="vTags" class="hbars"></div></div>
+</div>
+<div class="card">
+  <div class="top" style="margin-bottom:6px"><h3>Videos</h3><div class="chips" id="vFilters" style="margin:0"></div></div>
+  <div id="vList"></div>
+</div>
+</section>
 
 <section id="intake">
 <div class="top"><div><h2>Add a video</h2><p class="mu" style="margin:6px 0 0">Paste a public TikTok or Instagram link. AI drafts a case, and you decide what happens next.</p></div></div>
@@ -39,24 +78,28 @@
 </section>
 
 <section id="inbox">
-<div class="top"><div><h2>Inbox</h2><p class="mu" style="margin:6px 0 0">Your tracker of every case, in one place.</p></div><button class="btn o" onclick="go('intake')">Add a video</button></div>
+<div class="top"><div><h2>311 cases</h2><p class="mu" style="margin:6px 0 0">Fix requests turned into draft 311 service requests, routed to agencies, community boards and council offices. Click a row to review. Nothing is filed automatically.</p></div><button class="btn o" onclick="go('intake')">Add a video</button></div>
 <div class="grid g4" style="margin-bottom:20px">
 <div class="card tile"><small>Total cases</small><b id="tileNew">0</b><small>&nbsp;</small></div>
 <div class="card tile"><small>Issues vs Ideas</small><b id="tileSplit">0 &middot; 0</b><small id="tileSplitSub">0 other</small></div>
 <div class="card tile"><small>Needs review</small><b id="tileReview">0</b><small>Unsure about location</small></div>
-<div class="card tile"><small>Avg time to triage</small><b>&mdash;</b><small>Not tracked yet</small></div>
+<div class="card tile"><small>311 drafts</small><b id="tileSR">0</b><small id="tileSRSub">0 filed</small></div>
 </div>
 <div class="card" style="margin-bottom:20px">
 <div class="chips" aria-label="Filters"><span>Type: All &#9662;</span><span>Agency: All &#9662;</span><span>Status: All &#9662;</span><span>Urgency: All &#9662;</span><span>Sort: Newest &#9662;</span></div>
-<div class="tw"><table><thead><tr><th>Type</th><th>Summary</th><th>Agency</th><th>Area</th><th>Urgency</th><th>Priority</th><th>Status</th><th>Views</th></tr></thead><tbody id="tb"></tbody></table></div>
+<div class="tw"><table><thead><tr><th>Type</th><th>Summary</th><th>Agency</th><th>Area</th><th>Urgency</th><th>Priority</th><th>Status</th><th>311</th><th>Views</th></tr></thead><tbody id="tb"></tbody></table></div>
 </div>
-<div class="card"><h3>Recurring themes</h3><p class="mu" style="margin-top:8px">Not wired up yet &mdash; will cluster once <code>/api/signals/aggregate</code> is called on reviewed cases.</p></div>
+<div class="grid g2">
+<div class="card"><h3>Where to route</h3><p class="mu" style="margin:6px 0 10px">Agencies, community boards and council districts across all 311 drafts.</p><div id="routeSummary" class="hbars"></div></div>
+<div class="card"><h3>Recurring themes</h3><p class="mu" style="margin-top:8px" id="themes">Groups appear once two or more reviewed cases share a topic and borough (<code>/api/signals/aggregate</code>).</p></div>
+</div>
 </section>
 
 </main>
-<script src="api.js"></script>
-<script src="app.js"></script>
+<footer class="sitefoot">An independent hackathon project (State Capacity AI Hackathon). Not affiliated with the Office of the Mayor or the City of New York. Built from public posts; creator handles only. To report a problem to the city, use <a href="https://portal.311.nyc.gov/" target="_blank" rel="noopener">NYC 311</a>.</footer>
+<script src="api.js?v=4"></script>
+<script src="app.js?v=4"></script>
 <script>
-document.getElementById("modeBadge").textContent = "Design proof · " + (MOCK_MODE ? "mock data" : "live backend");
+document.getElementById("modeBadge").textContent = MOCK_MODE ? "Mock data" : "Live data";
 </script>
 </body></html>

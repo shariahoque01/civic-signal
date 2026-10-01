@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Civic Signal</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --ink: #1c1b19; --muted: #6b6860; --line: #e3e0d8;
+  --accent: #1f5fd1; --ai: #7a4fd6; --ai-bg: #f3effc; --ok: #1d7a46; --ok-bg: #e8f5ed;
+  --warn: #a15c00; --warn-bg: #fdf1e0; --bad: #b3261e;
+  --t-roads: #1f5fd1; --t-trash: #1d7a46; --t-rats: #8a4b2a; --t-parks: #3f8f2f; --t-other: #8c8a83;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #151513; --panel: #1f1e1b; --ink: #ecebe6; --muted: #a3a097; --line: #34322d;
+  --accent: #6f9cf0; --ai: #b495f2; --ai-bg: #2a2438; --ok: #5cc28a; --ok-bg: #1b2f23;
+  --warn: #f0b35c; --warn-bg: #33281a; --bad: #f08a82;
+}}
+:root[data-theme="dark"] {
+  --bg: #151513; --panel: #1f1e1b; --ink: #ecebe6; --muted: #a3a097; --line: #34322d;
+  --accent: #6f9cf0; --ai: #b495f2; --ai-bg: #2a2438; --ok: #5cc28a; --ok-bg: #1b2f23;
+  --warn: #f0b35c; --warn-bg: #33281a; --bad: #f08a82;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+header { padding: 20px 24px 8px; display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; justify-content: space-between; }
+h1 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
+h1 small { font-weight: 400; color: var(--muted); font-size: 14px; margin-left: 8px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+main { padding: 8px 24px 40px; display: grid; gap: 16px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.tiles { grid-column: span 12; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.tile b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); font-size: 12px; }
+#mapPanel { grid-column: span 7; } #map { height: 360px; border-radius: 8px; }
+#chartsPanel { grid-column: span 5; display: flex; flex-direction: column; gap: 18px; }
+.bars { display: grid; gap: 6px; }
+.bar { display: grid; grid-template-columns: 92px 1fr 28px; gap: 8px; align-items: center; font-size: 12px; }
+.bar i { display: block; height: 14px; border-radius: 3px; background: var(--accent); min-width: 2px; }
+.bar em { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+#queue { grid-column: span 12; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.case { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.case > div { padding: 14px 16px; min-width: 0; }
+.case .src { border-right: 1px solid var(--line); }
+.meta { color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.meta a { color: var(--accent); }
+.caption { margin: 6px 0; overflow-wrap: anywhere; }
+details { margin-top: 6px; } summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, Menlo, monospace; background: var(--bg); padding: 10px; border-radius: 6px; margin: 6px 0 0; max-height: 220px; overflow: auto; }
+.tag { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); margin: 0 4px 4px 0; }
+.tag.ai { border: 1px dashed var(--ai); color: var(--ai); background: var(--ai-bg); }
+.tag.warn { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+.tag.ok { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+.sr h3 { margin: 0 0 4px; font-size: 15px; }
+.sr dl { display: grid; grid-template-columns: 110px 1fr; gap: 3px 10px; margin: 8px 0; font-size: 13px; }
+.sr dt { color: var(--muted); } .sr dd { margin: 0; overflow-wrap: anywhere; }
+table.route { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+.route th { text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); padding: 4px 6px; }
+.route td { border-bottom: 1px solid var(--line); padding: 5px 6px; vertical-align: top; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+button.btn, a.btn { font: inherit; font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; text-decoration: none; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.empty { color: var(--muted); padding: 24px; text-align: center; }
+#intake textarea { width: 100%; min-height: 70px; font: 12px ui-monospace, Menlo, monospace; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+#intake { grid-column: span 12; }
+#runLog { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.notice { font-size: 12px; color: var(--muted); }
+@media (max-width: 900px) {
+  header, main { padding-left: 16px; padding-right: 16px; }
+  #mapPanel, #chartsPanel { grid-column: span 12; }
+  .case { grid-template-columns: 1fr; } .case .src { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Civic Signal <small>#mamdanifixthis → 311 drafts</small></h1>
+  <span class="notice">AI/keyword suggestions are <span class="tag ai">dashed</span>. Nothing is filed automatically — staff file on the 311 portal and record the SR number.</span>
+</header>
+<main>
+  <section class="tiles" id="tiles"></section>
+  <section class="panel" id="mapPanel"><h2>Where (geocoded drafts)</h2><div id="map"></div></section>
+  <section class="panel" id="chartsPanel">
+    <div><h2>Posts per day</h2><div class="bars" id="byDay"></div></div>
+    <div><h2>Topics</h2><div class="bars" id="byTopic"></div></div>
+    <div><h2>Community boards</h2><div class="bars" id="byBoard"></div></div>
+  </section>
+  <section class="panel" id="queue">
+    <h2>Triage queue</h2>
+    <div class="filters" id="filters"></div>
+    <div id="cases"></div>
+  </section>
+  <section class="panel" id="intake">
+    <h2>Add videos</h2>
+    <textarea id="urls" placeholder="Paste TikTok or Instagram URLs, one per line"></textarea>
+    <div class="actions"><button class="btn primary" id="runBtn">Run workflow</button></div>
+    <div id="runLog"></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const TOPIC_COLORS = {roads:'--t-roads', trash:'--t-trash', rats:'--t-rats', parks:'--t-parks'};
+const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let data = { cases: [] }, filter = 'actionable', map, layer;
+
+function bars(el, counts, colorFor) {
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...entries.map(e => e[1]));
+  el.innerHTML = entries.length ? entries.map(([k, v]) =>
+    `<div class="bar"><span title="${esc(k)}">${esc(k.length > 14 ? k.slice(0, 13) + '…' : k)}</span><i style="width:${v / max * 100}%;${colorFor ? `background:var(${colorFor(k)})` : ''}"></i><em>${v}</em></div>`
+  ).join('') : '<div class="notice">No data yet</div>';
+}
+const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
+
+function render() {
+  const cs = data.cases, srs = cs.filter(c => c.service_request);
+  const review = cs.filter(c => c.observation.confidence < 0.5 || c.observation.location.needs_review);
+  const tiles = [
+    [cs.length, 'posts processed'], [srs.length, '311 drafts'],
+    [srs.filter(c => c.service_request.status === 'filed').length, 'filed'],
+    [review.length, 'need human review'],
+    [cs.reduce((s, c) => s + (c.source.views || 0), 0).toLocaleString(), 'total views'],
+  ];
+  $('#tiles').innerHTML = tiles.map(([n, l]) => `<div class="tile"><b>${n}</b><span>${l}</span></div>`).join('');
+
+  const days = {};
+  for (let i = 5; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5); days[d.toLocaleDateString(undefined, {month:'short', day:'numeric'})] = 0; }
+  cs.forEach(c => { if (!c.source.posted_at) return; const k = new Date(c.source.posted_at).toLocaleDateString(undefined, {month:'short', day:'numeric'}); if (k in days) days[k]++; });
+  const dayEl = $('#byDay'); const max = Math.max(1, ...Object.values(days));
+  dayEl.innerHTML = Object.entries(days).map(([k, v]) => `<div class="bar"><span>${k}</span><i style="width:${v / max * 100}%"></i><em>${v}</em></div>`).join('');
+  bars($('#byTopic'), count(cs, c => c.observation.topic), k => TOPIC_COLORS[k] || '--t-other');
+  bars($('#byBoard'), count(srs, c => c.service_request.community_board?.replace(' Community Board ', ' CB ')));
+
+  layer.clearLayers();
+  const pts = [];
+  srs.forEach(c => { const s = c.service_request; if (s.latitude == null) return;
+    pts.push([s.latitude, s.longitude]);
+    L.circleMarker([s.latitude, s.longitude], { radius: 8, weight: 2, color: cssVar(TOPIC_COLORS[c.observation.topic] || '--t-other'), fillOpacity: .5 })
+      .bindPopup(`<b>${esc(s.complaint_type)}</b><br>${esc(s.address || '')}<br>@${esc(c.source.handle)}`).addTo(layer);
+  });
+  if (pts.length) map.fitBounds(pts, { maxZoom: 14, padding: [30, 30] });
+
+  const filters = { actionable: ['311 drafts', c => c.service_request], review: ['Needs review', c => review.includes(c)], other: ['Not actionable', c => !c.service_request], all: ['All', () => true] };
+  $('#filters').innerHTML = Object.entries(filters).map(([k, [label, f]]) => `<button class="chip" data-f="${k}" aria-pressed="${k === filter}">${label} (${cs.filter(f).length})</button>`).join('');
+  document.querySelectorAll('.chip').forEach(b => b.onclick = () => { filter = b.dataset.f; render(); });
+  const shown = cs.filter(filters[filter][1]);
+  $('#cases').innerHTML = shown.length ? shown.map(caseHtml).join('') : `<div class="empty">No cases here yet. Run <code>python -m scripts.run_workflow</code> or paste URLs below.</div>`;
+  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => { const c = cs.find(x => x.service_request?.id === b.dataset.copy); navigator.clipboard.writeText(srText(c.service_request)); b.textContent = 'Copied'; });
+  document.querySelectorAll('[data-status]').forEach(b => b.onclick = () => setStatus(b.dataset.id, b.dataset.status));
+}
+
+const srText = s => `Complaint type: ${s.complaint_type}\nDescriptor: ${s.descriptor}\nAgency: ${s.agency}\nLocation: ${s.address || 'Unknown'}\n\n${s.description}`;
+
+function caseHtml(c) {
+  const o = c.observation, s = c.source, sr = c.service_request;
+  const posted = s.posted_at ? new Date(s.posted_at).toLocaleString(undefined, {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : '—';
+  const flags = [
+    `<span class="tag ai">${esc(o.type)} · ${esc(o.topic)}</span>`,
+    `<span class="tag ai">confidence ${Math.round(o.confidence * 100)}%</span>`,
+    o.location.needs_review ? '<span class="tag warn">location unconfirmed</span>' : '<span class="tag ok">location found</span>',
+    o.urgency === 'high' ? '<span class="tag warn">urgent</span>' : '',
+  ].join('');
+  const left = `<div class="src">
+    <div class="meta"><b>@${esc(s.handle || 'unknown')}</b><span>${esc(s.platform)}</span><span>${posted}</span><span>${(s.views || 0).toLocaleString()} views</span><a href="${esc(s.url)}" target="_blank" rel="noopener">open ↗</a></div>
+    <div>${flags}</div>
+    <div class="caption">${esc(s.caption || '(no caption)')}</div>
+    ${o.evidence?.quote ? `<div class="notice">Quote: “${esc(o.evidence.quote)}”</div>` : ''}
+    <details><summary>Full transcript (caption, location tag, on-screen text, speech)</summary><pre>${esc(s.transcript)}</pre></details>
+  </div>`;
+  if (!sr) return `<div class="case">${left}<div class="sr"><h3>No 311 drafted</h3><p class="notice">${esc(o.evidence?.note || 'Classified as not an actionable city-service issue (e.g. news, commentary, or topic unclear). Open the video to double-check.')}</p></div></div>`;
+  const statusTag = { draft: 'ai', approved: 'ok', filed: 'ok', declined: 'warn' }[sr.status];
+  const routes = (sr.routing || []).map(r => `<tr><td>${esc(r.role.replace(/_/g, ' '))}</td><td><b>${esc(r.name)}</b><br><span class="notice">${esc(r.detail)}</span></td><td>${esc(r.why)}</td></tr>`).join('');
+  return `<div class="case">${left}<div class="sr">
+    <h3>${esc(sr.complaint_type)} <span class="tag ${statusTag}">${esc(sr.status)}${sr.sr_number ? ' · ' + esc(sr.sr_number) : ''}</span></h3>
+    <dl><dt>Descriptor</dt><dd>${esc(sr.descriptor)}</dd><dt>Agency</dt><dd>${esc(sr.agency)}</dd>
+    <dt>Location</dt><dd>${esc(sr.address || 'Unknown — needs a human')}</dd>
+    <dt>Community board</dt><dd>${esc(sr.community_board || '—')}</dd><dt>Council district</dt><dd>${sr.council_district ?? '—'}</dd></dl>
+    <details open><summary>311 description</summary><pre>${esc(sr.description)}</pre></details>
+    <table class="route"><thead><tr><th>Role</th><th>Route to</th><th>Why</th></tr></thead><tbody>${routes}</tbody></table>
+    <div class="actions">
+      <button class="btn" data-copy="${sr.id}">Copy 311 text</button>
+      <a class="btn" href="${data.portal_url}" target="_blank" rel="noopener">Open 311 portal ↗</a>
+      <button class="btn" data-id="${sr.id}" data-status="approved">Approve</button>
+      <button class="btn primary" data-id="${sr.id}" data-status="filed">Mark filed…</button>
+      <button class="btn" data-id="${sr.id}" data-status="declined">Decline</button>
+    </div></div></div>`;
+}
+
+async function setStatus(id, status) {
+  const body = { status };
+  if (status === 'filed') { const n = prompt('311 SR number (from the portal confirmation):'); if (n === null) return; body.sr_number = n; }
+  await fetch(`/api/service-requests/${id}`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+  load();
+}
+
+async function load() { data = await (await fetch('/api/cases')).json(); render(); }
+
+$('#runBtn').onclick = async () => {
+  const urls = $('#urls').value.split(/\s+/).filter(Boolean);
+  if (!urls.length) return;
+  $('#runLog').textContent = `Processing ${urls.length} URL(s)…`;
+  const r = await (await fetch('/api/workflow/run', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ urls }) })).json();
+  $('#runLog').textContent = r.counts ? Object.entries(r.counts).map(([k, v]) => `${v} ${k}`).join(' · ') : (r.error || 'Failed');
+  load();
+};
+
+map = L.map('map').setView([40.70, -73.95], 10);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
+layer = L.layerGroup().addTo(map);
+load();
+</script>
+</body>
+</html>

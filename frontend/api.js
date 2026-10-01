@@ -57,8 +57,47 @@
  * own High/Medium/Low so there is no translation layer to keep in sync.
  */
 
-const MOCK_MODE = true;
-const API_BASE = "http://127.0.0.1:8000";
+// Served by the backend at /ui/, so the API is same-origin. Set MOCK_MODE = true to
+// demo without a backend (mock data below), or open ?mock=1.
+const MOCK_MODE = /[?&]mock=1/.test(location.search);
+// Static snapshot (built by backend/scripts/export_static.py for Vercel): read data/*.json, no writes.
+const SNAPSHOT = window.CIVIC_SNAPSHOT || null;
+const _snapCache = {};
+function _snap(name) {
+  if (!_snapCache[name]) _snapCache[name] = fetch("data/" + name + ".json").then((r) => {
+    if (!r.ok) throw new Error("Snapshot data missing: " + name);
+    return r.json();
+  });
+  return _snapCache[name];
+}
+function _readOnly() {
+  const err = new Error("This is a read-only snapshot. Run the app locally to edit or add videos.");
+  err.status = 403;
+  return Promise.reject(err);
+}
+const API_BASE = location.protocol === "file:" ? "http://127.0.0.1:8000" : "";
+
+/*
+ * Added endpoints (backend/app/videos.py, backend/app/main.py):
+ *   GET  /api/videos?days=7          -> { total, days, videos: Video[] }  every ingested video, 311 or not
+ *   GET  /api/cases                  -> { cases: [{ observation, source, service_request }] }
+ *   POST /api/workflow/run {urls[]}  -> { counts, results[] }  fetch + filter + extract + 311 draft
+ *   PATCH /api/service-requests/{id} {status, sr_number, ...} -> case
+ * `_toObservation` folds source metadata into the `display` field the screens already read,
+ * and attaches `service_request` (null when no 311 was drafted).
+ */
+function _fmtCount(n) { return n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n || 0); }
+function _toObservation(c) {
+  var s = c.source, o = c.observation;
+  o.display = {
+    handle: s.handle ? "@" + s.handle : null, platform: s.platform, url: s.url,
+    views: _fmtCount(s.views), shares: null, likes: _fmtCount(s.likes),
+    date: s.posted_at ? new Date(s.posted_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "",
+    caption: s.caption, transcript: s.transcript, note: o.evidence && o.evidence.note,
+  };
+  o.service_request = c.service_request;
+  return o;
+}
 
 // ---- mock data ------------------------------------------------------------
 // Shaped exactly like real Observations, plus a few UI-only "display" fields
@@ -168,6 +207,7 @@ const api = {
    * @returns {Promise<Observation>}
    */
   async processVideo({ url, platform, file_path }) {
+    if (SNAPSHOT) return _readOnly();
     if (MOCK_MODE) {
       await _mockDelay(1600);
       if (/error|fail/i.test(url || "")) {
@@ -197,7 +237,18 @@ const api = {
       err.status = 501;
       throw err;
     }
-    return _real("/api/process", { method: "POST", body: JSON.stringify({ url, platform }) });
+    // The workflow endpoint also captures post metadata and drafts the 311, and works without a Gemini key.
+    const run = await _real("/api/workflow/run", { method: "POST", body: JSON.stringify({ urls: [url], window_days: 60 }) });
+    const r = run.results[0];
+    if (r.status === "error") { const err = new Error(r.reason); err.status = 400; throw err; }
+    if (r.status === "skipped" && r.reason !== "already processed") { const err = new Error("Not added: " + r.reason); err.status = 422; throw err; }
+    if (!r.observation_id) {
+      const all = await this.getCases();
+      const hit = all.observations.find((o) => o.display.url && url.indexOf(o.display.url) === 0);
+      if (!hit) { const err = new Error("Saved, but it isn't a fix request, so there's no case to review (see This week's videos)."); err.status = 422; throw err; }
+      return hit;
+    }
+    return this.getCase(r.observation_id);
   },
 
   /**
@@ -214,9 +265,13 @@ const api = {
       }
       return { total: list.length, count: list.length, observations: list };
     }
-    const params = new URLSearchParams(Object.entries(filters).filter(([, v]) => v != null));
-    const qs = params.toString();
-    return _real(`/api/observations${qs ? `?${qs}` : ""}`);
+    const res = SNAPSHOT ? await _snap("cases") : await _real("/api/cases");
+    let list = res.cases.map(_toObservation);
+    for (const key of ["status", "borough", "topic", "type"]) {
+      if (filters[key]) list = list.filter((o) => (key === "borough" ? o.location.borough : o[key]) === filters[key]);
+    }
+    if (filters.limit) list = list.slice(0, filters.limit);
+    return { total: res.total, count: list.length, observations: list, portal_url: res.portal_url };
   },
 
   /**
@@ -235,7 +290,10 @@ const api = {
       }
       return found;
     }
-    return _real(`/api/observations/${encodeURIComponent(id)}`);
+    const all = await this.getCases();
+    const found = all.observations.find((o) => o.id === id);
+    if (!found) { const err = new Error("Case not found"); err.status = 404; throw err; }
+    return found;
   },
 
   /**
@@ -246,6 +304,7 @@ const api = {
    * @returns {Promise<Observation>}
    */
   async saveCase(id, patch) {
+    if (SNAPSHOT) return _readOnly();
     if (MOCK_MODE) {
       await _mockDelay(250);
       const found = MOCK_OBSERVATIONS.find((o) => o.id === id);
@@ -261,5 +320,39 @@ const api = {
       return found;
     }
     return _real(`/api/observations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
+  },
+
+  /** Full transcript-analysis payload (backend/app/insights.py): sentiment, blind_spots, engagement_plan, ... Cached per page load. */
+  async getInsights() {
+    if (MOCK_MODE) { const err = new Error("Insights need the live backend."); err.status = 501; throw err; }
+    if (!this._insights) this._insights = (SNAPSHOT ? _snap("insights") : _real("/api/insights")).catch((e) => { this._insights = null; throw e; });
+    return this._insights;
+  },
+
+  /** Every ingested video in the last `days` days, 311 case or not. */
+  async getVideos(days = 7) {
+    if (MOCK_MODE) {
+      await _mockDelay(150);
+      return { total: MOCK_OBSERVATIONS.length, days, videos: MOCK_OBSERVATIONS.map((o) => ({
+        id: o.source_id, platform: o.display.platform, url: null, handle: (o.display.handle || "").replace("@", ""),
+        posted_at: o.created_at, views: 0, likes: 0, caption: o.summary, hashtags: [], relevance: "fix_request",
+        transcript: o.evidence.quote, observation: { id: o.id, type: o.type, topic: o.topic, summary: o.summary, quote: o.evidence.quote },
+        service_request: null,
+      })) };
+    }
+    if (SNAPSHOT) {
+      const all = await _snap("videos");
+      const cutoff = new Date(SNAPSHOT.exported_at).getTime() - days * 864e5;  // window relative to export time
+      const videos = all.videos.filter((v) => v.posted_at && new Date(v.posted_at).getTime() >= cutoff);
+      return { total: videos.length, days, videos };
+    }
+    return _real(`/api/videos?days=${days}`);
+  },
+
+  /** Update a drafted 311 request: status (draft|approved|filed|declined), sr_number, or edited fields. */
+  async updateServiceRequest(id, patch) {
+    if (SNAPSHOT) return _readOnly();
+    if (MOCK_MODE) { await _mockDelay(150); return null; }
+    return _real(`/api/service-requests/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
   },
 };

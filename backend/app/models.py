@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -29,6 +29,23 @@ class Source(Base):
     caption: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     language: Mapped[str] = mapped_column(String, default=DEFAULT_LANGUAGE)
     engagement: Mapped[int] = mapped_column(Integer, default=0)
+    # Public post metadata (handle only, no profile data).
+    creator_handle: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    view_count: Mapped[int] = mapped_column(Integer, default=0)
+    mentions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    hashtags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    thumbnail_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # Corpus fields: every fetched video is stored, fix request or not (see constants.RELEVANCE_LABELS).
+    relevance: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    discovered_via: Mapped[list[str]] = mapped_column(JSON, default=list)  # e.g. ["#mamdanifixthis", "manual"]
+    comment_count: Mapped[int] = mapped_column(Integer, default=0)
+    share_count: Mapped[int] = mapped_column(Integer, default=0)
+    location_tag: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    speech_language: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    has_speech: Mapped[bool] = mapped_column(Boolean, default=False)
+    speech_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # ASR captions only
+    on_screen_text: Mapped[list[str]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     ingestion_timestamp: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
@@ -60,6 +77,32 @@ class Observation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     source: Mapped[Source] = relationship(back_populates="observations")
+    service_request: Mapped[Optional["ServiceRequest"]] = relationship(back_populates="observation", uselist=False)
+
+
+class ServiceRequest(Base):
+    """A drafted 311 request. Drafts are never auto-filed; staff file them and record the SR number."""
+
+    __tablename__ = "service_requests"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: _new_id("service_request"))
+    observation_id: Mapped[str] = mapped_column(ForeignKey("observations.id"), unique=True, index=True)
+    complaint_type: Mapped[str] = mapped_column(String)
+    descriptor: Mapped[str] = mapped_column(String)
+    agency: Mapped[str] = mapped_column(String)
+    address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    community_district: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    council_district: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    description: Mapped[str] = mapped_column(Text)
+    routing: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String, default="draft", index=True)
+    sr_number: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    observation: Mapped[Observation] = relationship(back_populates="service_request")
 
 
 class CivicSignal(Base):

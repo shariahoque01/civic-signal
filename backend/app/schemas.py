@@ -165,3 +165,25 @@ class HealthResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: str
+
+
+class WorkflowRunRequest(BaseModel):
+    urls: list[str] = Field(min_length=1, max_length=200)
+    window_days: int = Field(5, ge=1, le=60)
+
+
+class WorkflowRunResponse(BaseModel):
+    counts: dict[str, int]
+    results: list[dict[str, Any]]
+
+
+class ServiceRequestUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    complaint_type: Optional[str] = None
+    descriptor: Optional[str] = None
+    agency: Optional[str] = None
+    address: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[Literal["draft", "approved", "filed", "declined"]] = None
+    sr_number: Optional[str] = None

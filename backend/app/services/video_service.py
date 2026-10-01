@@ -3,6 +3,8 @@ import asyncio
 import logging
 import re
 import tempfile
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -19,6 +21,59 @@ logger = logging.getLogger(__name__)
 
 class ExtractionError(RuntimeError):
     pass
+
+
+@dataclass
+class PostMetadata:
+    creator_handle: Optional[str] = None
+    posted_at: Optional[datetime] = None  # naive UTC
+    view_count: int = 0
+    like_count: int = 0
+    caption: str = ""
+    mentions: list[str] = field(default_factory=list)
+    hashtags: list[str] = field(default_factory=list)
+    thumbnail_url: Optional[str] = None
+
+
+@dataclass
+class VideoBundle:
+    transcript: str
+    language: str
+    engagement: int
+    meta: PostMetadata
+
+
+MENTION_RE = re.compile(r"@([A-Za-z0-9_.]{2,30})")
+HASHTAG_RE = re.compile(r"#(\w{2,60})")
+
+
+def parse_metadata(info: dict[str, Any]) -> PostMetadata:
+    """Pull public post metadata out of a yt-dlp info dict."""
+    caption = info.get("description") or info.get("title") or ""
+    ts = info.get("timestamp")
+    posted = datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=None) if ts else None
+    if posted is None and info.get("upload_date"):
+        try:
+            posted = datetime.strptime(info["upload_date"], "%Y%m%d")
+        except ValueError:
+            posted = None
+    handle = info.get("channel") or info.get("uploader_id") or info.get("uploader")
+    return PostMetadata(
+        creator_handle=str(handle).lstrip("@") if handle else None,
+        posted_at=posted,
+        view_count=int(info.get("view_count") or 0),
+        like_count=int(info.get("like_count") or 0),
+        caption=caption,
+        mentions=list(dict.fromkeys(m.rstrip(".").lower() for m in MENTION_RE.findall(caption))),
+        hashtags=list(dict.fromkeys(h.lower() for h in HASHTAG_RE.findall(caption))),
+        thumbnail_url=info.get("thumbnail"),
+    )
+
+
+async def fetch_metadata(url: str) -> tuple[PostMetadata, dict[str, Any]]:
+    """Cheap metadata-only fetch, used to filter posts before any AI processing."""
+    info = await asyncio.to_thread(_fetch_info, url)
+    return parse_metadata(info), info
 
 
 def validate_url(url: str, platform: str) -> bool:
@@ -109,10 +164,11 @@ async def _spoken_text(url: str, info: dict[str, Any]) -> str:
     return "" if gemini_service.NO_SPEECH_MARKER in text else text
 
 
-async def get_video_content(
-    url: Optional[str], platform: str, file_path: Optional[str] = None
-) -> tuple[str, str, int]:
-    """Return (transcript_text, language_code, engagement)."""
+async def get_video_bundle(
+    url: Optional[str], platform: str, file_path: Optional[str] = None,
+    info: Optional[dict[str, Any]] = None,
+) -> VideoBundle:
+    """Transcript plus post metadata. Pass `info` to reuse an earlier metadata fetch."""
     if platform == "upload" or (file_path and not url):
         if not file_path:
             raise ExtractionError("file_path is required for uploads")
@@ -121,19 +177,30 @@ async def get_video_content(
             transcript = await gemini_service.transcribe_video(path)
         except gemini_service.GeminiError as exc:
             raise ExtractionError(str(exc)) from exc
-        return transcript, DEFAULT_LANGUAGE, 0
+        return VideoBundle(transcript, DEFAULT_LANGUAGE, 0, PostMetadata())
 
     if not url:
         raise ExtractionError("url is required")
-    info = await asyncio.to_thread(_fetch_info, url)
+    if info is None:
+        info = await asyncio.to_thread(_fetch_info, url)
     subs, lang = await _subtitle_text(info)
     parts = [p for p in (info.get("title"), info.get("description")) if p]
     if subs:
         parts.append(f"Captions: {subs}")
-    speech = await _spoken_text(url, info)
-    if speech:
-        parts.append(f"Spoken transcript: {speech}")
+    if gemini_service.is_configured():
+        speech = await _spoken_text(url, info)
+        if speech:
+            parts.append(f"Spoken transcript: {speech}")
     transcript = "\n".join(dict.fromkeys(parts)).strip()  # dedupe title==description
     if not transcript:
         raise ExtractionError("No text (captions, title, or description) available for this video")
-    return transcript, lang or info.get("language") or DEFAULT_LANGUAGE, int(info.get("like_count") or 0)
+    meta = parse_metadata(info)
+    return VideoBundle(transcript, lang or info.get("language") or DEFAULT_LANGUAGE, meta.like_count, meta)
+
+
+async def get_video_content(
+    url: Optional[str], platform: str, file_path: Optional[str] = None
+) -> tuple[str, str, int]:
+    """Return (transcript_text, language_code, engagement)."""
+    bundle = await get_video_bundle(url, platform, file_path)
+    return bundle.transcript, bundle.language, bundle.engagement
