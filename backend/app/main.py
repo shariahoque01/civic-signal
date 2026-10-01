@@ -7,7 +7,9 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -15,8 +17,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app import schemas
 from app.config import get_settings
 from app.database import get_db, init_db
-from app.models import CivicSignal, Observation, Source, _now
-from app.services import gemini_service, video_service
+from app.insights import router as insights_router
+from app.models import CivicSignal, Observation, ServiceRequest, Source, _now
+from app.services import gemini_service, routing, video_service, workflow
+from app.videos import router as videos_router
 from app.services.aggregator import aggregate_observations_simple, group_observations
 from app.utils.constants import (
     APP_VERSION, CORS_ORIGINS, DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT,
@@ -44,6 +48,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["Content-Type"],
 )
+app.include_router(insights_router)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -191,3 +196,81 @@ async def aggregate(db: Session = Depends(get_db)) -> schemas.AggregateResponse:
         message="Aggregation complete", signals_created=created,
         signals_updated=updated, groups_found=groups_found,
     )
+
+
+# --- "Mamdani, fix this" workflow + dashboard ------------------------------------------
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+
+
+@app.middleware("http")
+async def no_cache_frontend(request: Request, call_next):
+    """Dev convenience: the frontend has no build step, so stop browsers caching stale copies."""
+    response = await call_next(request)
+    if request.url.path.startswith("/ui"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+app.include_router(videos_router)
+if FRONTEND_DIR.is_dir():  # the team's frontend/, served same-origin so no CORS setup is needed
+    app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="ui")
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    return RedirectResponse("/ui/")
+
+
+@app.get("/classic", include_in_schema=False)
+async def dashboard() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.post("/api/workflow/run", response_model=schemas.WorkflowRunResponse)
+async def run_workflow(req: schemas.WorkflowRunRequest, db: Session = Depends(get_db)) -> schemas.WorkflowRunResponse:
+    results = [await workflow.process_url(db, url, req.window_days) for url in dict.fromkeys(req.urls)]
+    counts: dict[str, int] = {}
+    for r in results:
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+    return schemas.WorkflowRunResponse(counts=counts, results=results)
+
+
+def _case(obs: Observation) -> dict:
+    src, sr = obs.source, obs.service_request
+    return {
+        "observation": schemas.ObservationResponse.from_orm_obj(obs).model_dump(mode="json"),
+        "source": {
+            "platform": src.platform, "url": src.post_url, "handle": src.creator_handle,
+            "posted_at": src.posted_at.isoformat() + "Z" if src.posted_at else None,
+            "views": src.view_count, "likes": src.engagement, "caption": src.caption,
+            "mentions": src.mentions or [], "hashtags": src.hashtags or [], "transcript": src.transcript,
+        },
+        "service_request": None if sr is None else {
+            "id": sr.id, "complaint_type": sr.complaint_type, "descriptor": sr.descriptor, "agency": sr.agency,
+            "address": sr.address, "latitude": sr.latitude, "longitude": sr.longitude,
+            "community_board": routing.community_board_name(sr.community_district),
+            "council_district": sr.council_district, "description": sr.description,
+            "routing": sr.routing, "status": sr.status, "sr_number": sr.sr_number,
+        },
+    }
+
+
+@app.get("/api/cases")
+async def list_cases(db: Session = Depends(get_db)) -> dict:
+    rows = db.scalars(
+        select(Observation).join(Source).order_by(Source.posted_at.desc().nullslast())
+    ).all()
+    return {"total": len(rows), "portal_url": "https://portal.311.nyc.gov/", "cases": [_case(o) for o in rows]}
+
+
+@app.patch("/api/service-requests/{sr_id}")
+async def update_service_request(sr_id: str, update: schemas.ServiceRequestUpdate, db: Session = Depends(get_db)) -> dict:
+    sr = db.get(ServiceRequest, sr_id)
+    if sr is None:
+        raise HTTPException(404, f"Service request {sr_id} not found")
+    for field, value in update.model_dump(exclude_unset=True).items():
+        setattr(sr, field, value)
+    db.commit()
+    return _case(sr.observation)

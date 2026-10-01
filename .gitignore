@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Civic Signal local state
+backend/database.db
+backend/test.db
+backend/uploads/
+.vercel
+.playwright-mcp/
+test.db
